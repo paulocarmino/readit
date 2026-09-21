@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>readit-idgaf</title>
+    <link rel="stylesheet" href="/app.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='5' y='1' width='6' height='14' rx='1.5' fill='%23c2410c'/%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand"><span class="mark" aria-hidden="true"></span>readit-idgaf</div>
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="usage" aria-selected="true">Usage</button>
+        <button role="tab" data-tab="logs" aria-selected="false">Logs</button>
+        <button role="tab" data-tab="credentials" aria-selected="false">Credentials</button>
+      </nav>
+      <div class="live" title="Auto-refresh every 5 s">
+        <span class="dot"></span><span id="updated">—</span>
+      </div>
+    </header>
+
+    <main>
+      <section id="tab-usage" role="tabpanel">
+        <div class="toolbar">
+          <div class="seg" id="range" role="group" aria-label="Time range">
+            <button data-value="24h">24h</button>
+            <button data-value="7d" aria-pressed="true">7 days</button>
+            <button data-value="30d">30 days</button>
+            <button data-value="all">All time</button>
+          </div>
+          <button class="btn ghost danger" id="clear-history">Clear history</button>
+        </div>
+
+        <div class="kpis" id="kpis"></div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Calls per day</h2>
+            <div class="legend">
+              <span><i class="sw ok"></i>OK</span><span><i class="sw bad"></i>Failed</span>
+            </div>
+          </div>
+          <div id="chart" class="chart"></div>
+        </div>
+
+        <div class="grid2">
+          <div class="panel">
+            <h2>Top hosts</h2>
+            <table class="mini" id="hosts"></table>
+          </div>
+          <div class="panel">
+            <h2>Adapters</h2>
+            <table class="mini" id="adapters"></table>
+            <h2 class="spaced">Tools</h2>
+            <table class="mini" id="tools"></table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head wrap">
+            <h2>Recent calls</h2>
+            <div class="filters">
+              <div class="seg small" id="status-filter" role="group" aria-label="Status">
+                <button data-value="" aria-pressed="true">All</button>
+                <button data-value="failed">Failed</button>
+                <button data-value="blocked">Blocked</button>
+                <button data-value="login">Login</button>
+              </div>
+              <input
+                id="search"
+                type="search"
+                placeholder="Filter URL or error"
+                autocomplete="off"
+              />
+            </div>
+          </div>
+          <div class="table-scroll">
+            <table class="calls" id="calls"></table>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-logs" role="tabpanel" hidden>
+        <div class="toolbar">
+          <div class="seg" id="level-filter" role="group" aria-label="Minimum level">
+            <button data-value="30" aria-pressed="true">Info+</button>
+            <button data-value="40">Warn+</button>
+            <button data-value="50">Errors</button>
+          </div>
+        </div>
+        <div class="panel flush">
+          <div id="logs" class="log-list"></div>
+        </div>
+      </section>
+
+      <section id="tab-credentials" role="tabpanel" hidden>
+        <div class="cred-head">
+          <div>
+            <h1>Credentials</h1>
+            <p class="muted">
+              Cookies injected into the agent's Chromium every time it starts, so it opens already
+              logged in.
+            </p>
+          </div>
+          <button class="btn primary" id="add-cred">Add credential</button>
+        </div>
+        <div id="cred-list" class="cred-list"></div>
+        <div class="panel note" id="storage-note"></div>
+      </section>
+    </main>
+
+    <dialog id="cred-dialog" aria-labelledby="dialog-title">
+      <form method="dialog" id="cred-form" novalidate></form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
