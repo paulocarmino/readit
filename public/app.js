@@ -901,7 +901,7 @@ async function refresh() {
     $('#updated').textContent = `Updated ${fmtClock(Date.now())}`;
   } catch (error) {
     $('#updated').textContent = error.message.includes('Not authorized')
-      ? 'Not authorized — reopen the printed URL'
+      ? 'Session expired — reload to sign in'
       : `Error: ${error.message}`;
   } finally {
     refreshing = false;

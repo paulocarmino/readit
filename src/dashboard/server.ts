@@ -1,8 +1,9 @@
 import { spawn } from 'node:child_process';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { extname } from 'node:path';
+import { dirname, extname } from 'node:path';
 import { z } from 'zod';
 import { loadConfig } from '../config.js';
 import { parseGenericCredential, parseRedditCredential } from '../credentials/parse.js';
@@ -22,6 +23,9 @@ const MIME: Record<string, string> = {
   '.css': 'text/css; charset=utf-8',
 };
 const AUTH_COOKIE = 'readit_dash';
+const AUTH_COOKIE_MAX_AGE_S = 30 * 24 * 60 * 60;
+/** Served without auth: the login page and its stylesheet. */
+const PUBLIC_WITHOUT_AUTH: Record<string, string> = { '/': 'login.html', '/app.css': 'app.css' };
 const MAX_BODY_BYTES = 256 * 1024;
 const RANGES: Record<string, number> = { '24h': 864e5, '7d': 7 * 864e5, '30d': 30 * 864e5, all: 0 };
 
@@ -63,7 +67,7 @@ function send(
     // already closed, and browsers do not retry a POST on it ("Failed to fetch").
     Connection: 'close',
     'Content-Security-Policy':
-      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
   });
   res.end(body);
 }
@@ -202,18 +206,41 @@ async function handleApi(
 }
 
 /**
- * Starts the local dashboard: usage stats, call history with per-call logs, and credential
- * management. Bound to 127.0.0.1 and protected by a per-run token (exchanged for an HttpOnly,
- * SameSite=Strict cookie), Host/Origin checks against DNS rebinding and CSRF, and a strict CSP.
+ * Loads the dashboard access token, creating it (mode 0600) on first run or when `rotate` is set.
+ * Persisting it lets the printed link be bookmarked across restarts.
  *
- * @param options - Whether to open the browser automatically
+ * @param file - Token file path
+ * @param rotate - Generate a new token, invalidating old links and cookies
+ * @returns The token
  */
-export async function startDashboard(options: { open: boolean }): Promise<void> {
+export function loadDashboardToken(file: string, rotate: boolean): string {
+  if (!rotate && existsSync(file)) {
+    const saved = readFileSync(file, 'utf8').trim();
+    if (saved.length >= 32) return saved;
+  }
+  const token = randomBytes(24).toString('base64url');
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+  writeFileSync(file, `${token}\n`, { mode: 0o600 });
+  return token;
+}
+
+/**
+ * Starts the local dashboard: usage stats, call history with per-call logs, and credential
+ * management. Bound to 127.0.0.1 and protected by a persistent token (exchanged for an HttpOnly,
+ * SameSite=Strict cookie valid for 30 days), Host/Origin checks against DNS rebinding and CSRF,
+ * and a strict CSP.
+ *
+ * @param options - Open the browser automatically; rotate the access token
+ */
+export async function startDashboard(options: {
+  open: boolean;
+  rotateToken: boolean;
+}): Promise<void> {
   const config = loadConfig();
   const stores = openStores(config);
   const logger = createLogger().child({ component: 'dashboard' });
   const port = config.dashboardPort;
-  const token = randomBytes(24).toString('base64url');
+  const token = loadDashboardToken(config.dashboardTokenFile, options.rotateToken);
   const allowedHosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
 
   const server = createServer((req, res) => {
@@ -222,13 +249,18 @@ export async function startDashboard(options: { open: boolean }): Promise<void> 
       if (!allowedHosts.has(host)) return send(res, 421, 'Misdirected request', 'text/plain');
       const url = new URL(req.url ?? '/', `http://${host}`);
 
-      // Token exchange: the printed URL carries ?token=..., which becomes an HttpOnly cookie.
+      // Token exchange: the printed URL (or the login form) carries ?token=..., which becomes an
+      // HttpOnly cookie.
       const queryToken = url.searchParams.get('token');
       if (queryToken !== null) {
-        if (!sameToken(queryToken, token)) return send(res, 401, 'Invalid token', 'text/plain');
+        const ok = sameToken(queryToken.trim(), token);
         res.writeHead(303, {
-          Location: '/',
-          'Set-Cookie': `${AUTH_COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/`,
+          Location: ok ? '/' : '/?invalid',
+          ...(ok
+            ? {
+                'Set-Cookie': `${AUTH_COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${AUTH_COOKIE_MAX_AGE_S}`,
+              }
+            : {}),
           'Referrer-Policy': 'no-referrer',
           Connection: 'close',
         });
@@ -237,11 +269,15 @@ export async function startDashboard(options: { open: boolean }): Promise<void> 
 
       const authed = sameToken(cookieValue(req, AUTH_COOKIE) ?? '', token);
       if (!authed) {
+        const loginFile = req.method === 'GET' ? PUBLIC_WITHOUT_AUTH[url.pathname] : undefined;
+        if (!loginFile)
+          return json(res, 401, { error: 'Not authorized: reload the dashboard and log in.' });
+        const body = await readFile(new URL(loginFile, PUBLIC_DIR), 'utf8');
         return send(
           res,
-          401,
-          'Not authorized. Open the URL printed by `pnpm dashboard` (the token changes on every start).',
-          'text/plain; charset=utf-8'
+          url.pathname === '/' ? 401 : 200,
+          body,
+          MIME[extname(loginFile)] ?? 'text/plain'
         );
       }
 
@@ -279,7 +315,7 @@ export async function startDashboard(options: { open: boolean }): Promise<void> 
 
   const link = `http://localhost:${port}/?token=${token}`;
   process.stderr.write(
-    `\n  readit-idgaf dashboard\n  ${link}\n\n  db:  ${config.dbPath}\n  key: ${config.keyFile}\n\n`
+    `\n  readit-idgaf dashboard\n  ${link}\n  (bookmarkable; \`pnpm dashboard --rotate-token\` invalidates it)\n\n  db:    ${config.dbPath}\n  key:   ${config.keyFile}\n  token: ${config.dashboardTokenFile}\n\n`
   );
   if (options.open) openInBrowser(link);
 

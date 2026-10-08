@@ -96,7 +96,8 @@ verdade com um cliente MCP (SDK `Client` + `StdioClientTransport`) contra págin
   **Nunca** logar, retornar em tool ou mandar ao frontend um valor de cookie. A UI só vê `preview`.
 - O `BrowserManager` sincroniza cookies no launch e antes de cada operação (checa
   `credentials_version` em `meta`), e remove do perfil cookies de credenciais apagadas.
-- Dashboard: só 127.0.0.1, token por execução → cookie HttpOnly SameSite=Strict, checagem de
+- Dashboard: só 127.0.0.1, token persistente (`~/.config/readit-idgaf/dashboard.token`, `--rotate-token` troca) → cookie
+  HttpOnly SameSite=Strict de 30 dias; sem cookie, `/` serve `public/login.html`, checagem de
   Host/Origin, CSP sem inline (usar `el.style`/classes, nunca `style=""` nem `innerHTML`).
 - Frontend (`public/`) é JS puro sem build; texto sempre via `textContent`.
 

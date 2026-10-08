@@ -17,6 +17,8 @@ export interface Config {
   dbPath: string;
   /** AES-256 key file used to encrypt credentials (kept outside the data dir). */
   keyFile: string;
+  /** Dashboard access token file (kept across restarts so the link can be bookmarked). */
+  dashboardTokenFile: string;
   /** Dashboard HTTP port (bound to 127.0.0.1). */
   dashboardPort: number;
 }
@@ -41,6 +43,7 @@ export function loadConfig(): Config {
     profileDir: process.env.READIT_PROFILE_DIR ?? join(dataDir, 'profile'),
     dbPath: process.env.READIT_DB_PATH ?? join(dataDir, 'readit.db'),
     keyFile: process.env.READIT_KEY_FILE ?? join(configHome, 'readit-idgaf', 'secret.key'),
+    dashboardTokenFile: join(configHome, 'readit-idgaf', 'dashboard.token'),
     dashboardPort: intFromEnv('READIT_DASHBOARD_PORT', 7777),
     headless: process.env.READIT_HEADLESS !== 'false',
     idleMs: intFromEnv('READIT_IDLE_MS', 10 * 60 * 1000),

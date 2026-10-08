@@ -26,7 +26,9 @@ This is not a scraper. There is no crawling, queue or concurrency: one page, on 
 pnpm dashboard
 ```
 
-Opens `http://localhost:7777/?token=…` (on WSL it opens in your Windows browser). Separate process
+Opens `http://localhost:7777/?token=…` (on WSL it opens in your Windows browser). The token is
+kept in `~/.config/readit-idgaf/dashboard.token`, so the link can be bookmarked; without it the page
+asks you to paste the token. `pnpm dashboard --rotate-token` generates a new one. Separate process
 from the MCP server: it reads the same database, so it shows calls from every MCP client and works
 even when no agent is running.
 
@@ -55,8 +57,7 @@ History is kept forever; use _Clear history_ to wipe it.
 - Threat model: this protects against accidental leaks (a copied/backed-up database, an agent
   reading the DB file). It does not protect against someone who already runs code as your user —
   the Chromium profile itself holds the same cookies.
-- The dashboard listens on 127.0.0.1 only, requires the per-run token (exchanged for an HttpOnly,
-  SameSite=Strict cookie), checks `Host`/`Origin` (DNS rebinding / CSRF from other sites) and
+- The dashboard listens on 127.0.0.1 only, requires the access token (exchanged for an HttpOnly, SameSite=Strict cookie valid for 30 days), checks `Host`/`Origin` (DNS rebinding / CSRF from other sites) and
   sends a strict CSP.
 
 ## Tools

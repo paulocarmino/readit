@@ -6,7 +6,10 @@
  */
 if (process.argv[2] === 'dashboard') {
   const { startDashboard } = await import('./dashboard/server.js');
-  await startDashboard({ open: !process.argv.includes('--no-open') });
+  await startDashboard({
+    open: !process.argv.includes('--no-open'),
+    rotateToken: process.argv.includes('--rotate-token'),
+  });
 } else {
   const { startMcp } = await import('./mcp.js');
   await startMcp();
