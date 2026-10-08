@@ -11,6 +11,8 @@ export interface Config {
   idleMs: number;
   /** Navigation / request timeout in ms. */
   timeoutMs: number;
+  /** How many pages may be read at the same time (separate tabs, one browser). */
+  maxConcurrency: number;
   /** Default max characters returned by read_page. */
   maxChars: number;
   /** SQLite file with call history, logs and encrypted credentials. */
@@ -49,5 +51,6 @@ export function loadConfig(): Config {
     idleMs: intFromEnv('READIT_IDLE_MS', 10 * 60 * 1000),
     timeoutMs: intFromEnv('READIT_TIMEOUT_MS', 30_000),
     maxChars: intFromEnv('READIT_MAX_CHARS', 40_000),
+    maxConcurrency: Math.max(1, intFromEnv('READIT_MAX_CONCURRENCY', 4)),
   };
 }

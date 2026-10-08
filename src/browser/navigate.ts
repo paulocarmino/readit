@@ -7,6 +7,8 @@ export interface NavigateOptions {
   timeoutMs: number;
   /** CSS selector that must be attached before extraction. */
   waitFor?: string;
+  /** Selector the caller will extract; if it is already there, the page is considered ready. */
+  selector?: string;
   /** Wait until the visible text stops changing (for JS-rendered pages). Default true. */
   waitForStableContent?: boolean;
   /** Throw on challenge/block pages. Default true (false for screenshots, where you want to see them). */
@@ -28,6 +30,7 @@ export async function waitForStableContent(page: Page, maxMs = 6000): Promise<vo
   const start = Date.now();
   let previous = -1;
   let stableSamples = 0;
+  const pollMs = 250;
 
   while (Date.now() - start < maxMs) {
     const length = await page.evaluate(() => document.body?.innerText.length ?? 0).catch(() => 0);
@@ -40,7 +43,7 @@ export async function waitForStableContent(page: Page, maxMs = 6000): Promise<vo
       stableSamples = 0;
     }
     previous = length;
-    await sleep(400);
+    await sleep(pollMs);
   }
 }
 
@@ -65,6 +68,7 @@ export async function navigate(
     timeout: options.timeoutMs,
   });
 
+  let targetFound = false;
   if (options.waitFor) {
     try {
       await page
@@ -74,12 +78,21 @@ export async function navigate(
           state: 'attached',
           timeout: Math.min(options.timeoutMs, 15_000),
         });
+      targetFound = true;
     } catch {
       warnings.push(`wait_for selector "${options.waitFor}" did not appear; extracted anyway.`);
     }
+  } else if (options.selector) {
+    // The caller only wants this element: once it is there, waiting for the rest is wasted time.
+    targetFound = await page
+      .locator(options.selector)
+      .first()
+      .waitFor({ state: 'attached', timeout: 2000 })
+      .then(() => true)
+      .catch(() => false);
   }
 
-  if (options.waitForStableContent !== false) await waitForStableContent(page);
+  if (options.waitForStableContent !== false && !targetFound) await waitForStableContent(page);
 
   const challenge = options.checkChallenge === false ? null : await detectChallenge(page);
   if (challenge) {

@@ -11,6 +11,9 @@ This is not a scraper. There is no crawling, queue or concurrency: one page, on 
 
 - One Chromium with a persistent profile at `~/.local/share/readit/profile`, launched lazily on
   the first tool call and closed when the MCP client exits.
+- Agents usually fire several `read_page` calls at once, so pages are read in parallel, in separate
+  tabs (`READIT_MAX_CONCURRENCY`, default 4). Lifecycle calls (`open_browser`, `close_browser`) wait
+  for the in-flight reads and then run alone.
 - Headless by default. `open_browser` relaunches it **visible** on the same profile so you can log in
   or solve a captcha. On WSL2 the window shows up through WSLg.
 - Site adapters turn pages into clean markdown:
@@ -116,6 +119,35 @@ run Claude Code and Codex at once, give one of them its own profile (and log in 
 claude mcp add readit --scope user -e READIT_PROFILE_DIR=/home/pcarmino/.local/share/readit/profile-claude -- node /home/pcarmino/readit/dist/index.js
 ```
 
+### Register in the Claude desktop app (chat)
+
+The chat side of the desktop app reads `%APPDATA%\\Claude\\claude_desktop_config.json`
+(Settings → Developer → Edit Config). On Windows with the project inside WSL, the server is launched
+through `wsl.exe`. Give it a profile of its own, because Chromium cannot share one profile between
+two running clients; saved credentials are injected into any profile, so it is still logged in.
+
+```json
+{
+  "mcpServers": {
+    "readit": {
+      "command": "wsl.exe",
+      "args": [
+        "-d",
+        "Ubuntu",
+        "-e",
+        "/usr/bin/env",
+        "READIT_PROFILE_DIR=/home/you/.local/share/readit/profile-desktop",
+        "/home/you/.local/share/mise/shims/node",
+        "/home/you/readit/dist/index.js"
+      ]
+    }
+  }
+}
+```
+
+Restart the app completely afterwards. Claude Code sessions (including the app's Code tab) do not
+use this file: they read `~/.claude.json` inside WSL, written by `claude mcp add`.
+
 ### First login (Reddit, etc.)
 
 Either add a credential in the dashboard (`pnpm dashboard` → Credentials), or ask the agent to
@@ -154,18 +186,19 @@ openssl rand -base64 32          # put the result in READIT_SECRET_KEY
 
 ## Configuration (env vars)
 
-| Variable                | Default                           | Meaning                                                       |
-| ----------------------- | --------------------------------- | ------------------------------------------------------------- |
-| `READIT_PROFILE_DIR`    | `~/.local/share/readit/profile`   | Chromium profile directory                                    |
-| `READIT_HEADLESS`       | `true`                            | `false` = always use a visible window                         |
-| `READIT_IDLE_MS`        | `600000`                          | Close the headless browser after this idle time (`0` = never) |
-| `READIT_TIMEOUT_MS`     | `30000`                           | Navigation / request timeout                                  |
-| `READIT_MAX_CHARS`      | `40000`                           | Default `max_chars` of `read_page`                            |
-| `READIT_LOG_LEVEL`      | `info`                            | pino level (logs go to stderr; info+ also to the DB)          |
-| `READIT_DB_PATH`        | `~/.local/share/readit/readit.db` | History, logs and credentials                                 |
-| `READIT_KEY_FILE`       | `~/.config/readit/secret.key`     | Credential encryption key                                     |
-| `READIT_SECRET_KEY`     | —                                 | Base64 32-byte key (overrides the key file)                   |
-| `READIT_DASHBOARD_PORT` | `7777`                            | Dashboard port                                                |
+| Variable                 | Default                           | Meaning                                                       |
+| ------------------------ | --------------------------------- | ------------------------------------------------------------- |
+| `READIT_PROFILE_DIR`     | `~/.local/share/readit/profile`   | Chromium profile directory                                    |
+| `READIT_HEADLESS`        | `true`                            | `false` = always use a visible window                         |
+| `READIT_IDLE_MS`         | `600000`                          | Close the headless browser after this idle time (`0` = never) |
+| `READIT_TIMEOUT_MS`      | `30000`                           | Navigation / request timeout                                  |
+| `READIT_MAX_CHARS`       | `40000`                           | Default `max_chars` of `read_page`                            |
+| `READIT_MAX_CONCURRENCY` | `4`                               | Pages read at the same time (tabs in the one browser)         |
+| `READIT_LOG_LEVEL`       | `info`                            | pino level (logs go to stderr; info+ also to the DB)          |
+| `READIT_DB_PATH`         | `~/.local/share/readit/readit.db` | History, logs and credentials                                 |
+| `READIT_KEY_FILE`        | `~/.config/readit/secret.key`     | Credential encryption key                                     |
+| `READIT_SECRET_KEY`      | —                                 | Base64 32-byte key (overrides the key file)                   |
+| `READIT_DASHBOARD_PORT`  | `7777`                            | Dashboard port                                                |
 
 ## Adding a site adapter
 

@@ -233,8 +233,9 @@ export function createServer({
           const log = call.log.child({ adapter: adapter.name });
           call.info.adapter = adapter.name;
 
-          full = await manager.run(async () => {
-            const context = await manager.getContext();
+          full = await manager.runShared(async () => {
+            const context = manager.currentContext;
+            if (!context) throw new Error('Browser is not running');
             const ctx: AdapterContext = {
               withPage: (url, fn, options) =>
                 manager.withPage(async (page) => {
@@ -242,6 +243,7 @@ export function createServer({
                   const warnings = await navigate(page, url, {
                     timeoutMs: config.timeoutMs,
                     waitFor: args.wait_for,
+                    selector: args.selector,
                     waitForStableContent: options?.waitForStableContent,
                   });
                   log.info(
@@ -286,7 +288,7 @@ export function createServer({
     },
     (args) =>
       tracked('open_browser', args, (call) =>
-        manager.run(async () => {
+        manager.runExclusive(async () => {
           const target = args.url ? parseTargetUrl(args.url) : null;
           const context = await manager.getContext('headed');
           const page = context.pages()[0] ?? (await context.newPage());
@@ -328,7 +330,7 @@ export function createServer({
     },
     (args) =>
       tracked('screenshot', args, (call) =>
-        manager.run(async () => {
+        manager.runShared(async () => {
           const shoot = async (page: Page): Promise<CallToolResult> => {
             const buffer = await page.screenshot({
               type: 'jpeg',
@@ -355,7 +357,7 @@ export function createServer({
             });
           }
 
-          const pages = manager.currentMode ? (await manager.getContext()).pages() : [];
+          const pages = manager.currentContext?.pages() ?? [];
           const page = pages.at(-1);
           if (!page) throw new UserFacingError('No tab is open. Pass a url.', 'invalid');
           return shoot(page);
@@ -374,7 +376,7 @@ export function createServer({
     },
     () =>
       tracked('close_browser', {}, () =>
-        manager.run(async () => {
+        manager.runExclusive(async () => {
           const was = manager.currentMode;
           await manager.close();
           return text(was ? `Browser (${was}) closed.` : 'Browser was not running.');

@@ -33,13 +33,20 @@ const PROFILE_LOCK_PATTERN = /ProcessSingleton|SingletonLock|profile appears to 
  * - Lazy: launched on the first operation.
  * - One profile, one process: switching between headless and headed means closing and
  *   relaunching on the same profile (Chromium locks the profile directory).
- * - All operations are serialized through {@link run}, so parallel tool calls never race.
+ * - Page work runs concurrently in separate tabs ({@link runShared}, capped by
+ *   `maxConcurrency`); lifecycle work (launch, mode switch, close) runs alone
+ *   ({@link runExclusive}) after the in-flight page work drains.
  * - Shutdown is idempotent; cleanup errors are logged, never propagated.
  */
 export class BrowserManager {
   private context: BrowserContext | null = null;
   private mode: BrowserMode | null = null;
-  private queue: Promise<unknown> = Promise.resolve();
+  private lifecycle: Promise<unknown> = Promise.resolve();
+  /** Page operations in flight. */
+  private slots = 0;
+  /** Lifecycle operations waiting for the slots to drain (they also block new slots). */
+  private exclusiveWaiting = 0;
+  private waiters: Array<() => void> = [];
   private idleTimer: NodeJS.Timeout | null = null;
   private userAgent: string | null = null;
   private isShutDown = false;
@@ -52,19 +59,86 @@ export class BrowserManager {
   ) {}
 
   /**
-   * Runs `fn` after every previously queued operation has finished.
+   * Runs page work: takes one of the `maxConcurrency` slots, makes sure the browser and its
+   * credentials are ready (under the lifecycle lock), then runs `fn` concurrently with other
+   * page work.
    *
    * @param fn - Operation that uses the browser
    * @returns Whatever `fn` returns
    */
-  run<T>(fn: () => Promise<T>): Promise<T> {
+  async runShared<T>(fn: () => Promise<T>): Promise<T> {
     this.clearIdleTimer();
-    const result = this.queue.then(fn, fn);
-    this.queue = result.then(
-      () => this.armIdleTimer(),
-      () => this.armIdleTimer()
-    );
+    // Take the slot first: preparing before holding it would let a close_browser slip in between
+    // and leave this operation without a browser.
+    await this.acquireSlot();
+    try {
+      await this.runLifecycle(() => this.prepare());
+      return await fn();
+    } finally {
+      this.slots -= 1;
+      this.wake();
+      this.armIdleTimer();
+    }
+  }
+
+  /**
+   * Runs lifecycle work (launch, mode switch, close) alone: new page work is held back and the
+   * in-flight one is awaited first, so no tab is open while the browser is swapped or closed.
+   *
+   * @param fn - Operation that changes the browser's lifecycle
+   * @returns Whatever `fn` returns
+   */
+  async runExclusive<T>(fn: () => Promise<T>): Promise<T> {
+    this.clearIdleTimer();
+    this.exclusiveWaiting += 1;
+    try {
+      while (this.slots > 0) await this.waitForWake();
+      return await this.runLifecycle(fn);
+    } finally {
+      this.exclusiveWaiting -= 1;
+      this.wake();
+      this.armIdleTimer();
+    }
+  }
+
+  /** Serializes everything that launches, swaps or closes the browser. */
+  private runLifecycle<T>(fn: () => Promise<T>): Promise<T> {
+    const result = this.lifecycle.then(fn, fn);
+    this.lifecycle = result.catch(() => undefined);
     return result;
+  }
+
+  private async acquireSlot(): Promise<void> {
+    while (this.slots >= this.config.maxConcurrency || this.exclusiveWaiting > 0) {
+      await this.waitForWake();
+    }
+    this.slots += 1;
+  }
+
+  private waitForWake(): Promise<void> {
+    return new Promise<void>((resolve) => this.waiters.push(resolve));
+  }
+
+  private wake(): void {
+    const waiters = this.waiters;
+    this.waiters = [];
+    for (const resolve of waiters) resolve();
+  }
+
+  /** Makes sure a context is running and its cookies match the saved credentials. */
+  private async prepare(): Promise<BrowserContext> {
+    const context = this.context ?? (await this.getContext());
+    await this.syncCredentials(context);
+    return context;
+  }
+
+  /**
+   * The running context. Page work gets it after {@link runShared} prepared it.
+   *
+   * @returns The context, or null when the browser is not running
+   */
+  get currentContext(): BrowserContext | null {
+    return this.context;
   }
 
   /** Current mode, or null when the browser is not running. */
@@ -76,7 +150,7 @@ export class BrowserManager {
    * Returns the running context, launching it if needed.
    * With `want`, guarantees that mode (relaunching if the running one differs).
    * Without it, reuses whatever is running (a headed window stays headed).
-   * Must be called inside {@link run}.
+   * Must be called inside {@link runShared} or {@link runExclusive}.
    *
    * @param want - Required mode, if any
    * @returns The persistent browser context
@@ -285,7 +359,7 @@ export class BrowserManager {
 
     this.idleTimer = setTimeout(() => {
       this.log.info({ idleMs: this.config.idleMs }, 'Idle timeout, closing browser');
-      void this.run(() => this.close());
+      void this.runExclusive(() => this.close());
     }, this.config.idleMs);
     this.idleTimer.unref();
   }

@@ -78,6 +78,10 @@ verdade com um cliente MCP (SDK `Client` + `StdioClientTransport`) contra págin
 
 - Um único `launchPersistentContext` em `READIT_PROFILE_DIR` (padrão
   `~/.local/share/readit/profile`). Dois processos não podem usar o mesmo perfil ao mesmo tempo.
+- Concorrência (`BrowserManager`): `runShared` para trabalho de página (abas em paralelo, teto
+  `READIT_MAX_CONCURRENCY`), `runExclusive` para ciclo de vida (launch, troca de modo, close), que
+  espera as abas drenarem. `runShared` pega a vaga **antes** de preparar o contexto, senão um
+  `close_browser` entra no meio. Nunca serializar leitura de página: agentes disparam várias.
 - Headless por padrão; `open_browser` relança headed no mesmo perfil para login/captcha manual.
   O headed fica aberto até `close_browser` (sem idle timeout); o headless fecha após `READIT_IDLE_MS`.
 - `channel: 'chromium'` (binário completo, new headless) nos dois modos; UA sem "HeadlessChrome".
