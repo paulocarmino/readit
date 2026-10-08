@@ -315,7 +315,7 @@ export async function startDashboard(options: {
 
   const link = `http://localhost:${port}/?token=${token}`;
   process.stderr.write(
-    `\n  readit-idgaf dashboard\n  ${link}\n  (bookmarkable; \`pnpm dashboard --rotate-token\` invalidates it)\n\n  db:    ${config.dbPath}\n  key:   ${config.keyFile}\n  token: ${config.dashboardTokenFile}\n\n`
+    `\n  readit dashboard\n  ${link}\n  (bookmarkable; \`pnpm dashboard --rotate-token\` invalidates it)\n\n  db:    ${config.dbPath}\n  key:   ${config.keyFile}\n  token: ${config.dashboardTokenFile}\n\n`
   );
   if (options.open) openInBrowser(link);
 

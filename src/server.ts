@@ -101,7 +101,7 @@ export function createServer({
   logger,
   history,
 }: Dependencies): McpServer {
-  const server = new McpServer({ name: 'readit-idgaf', version: '1.0.0' });
+  const server = new McpServer({ name: 'readit', version: '1.0.0' });
   const cache = new Map<string, { text: string; at: number }>();
 
   const cacheGet = (key: string): string | undefined => {

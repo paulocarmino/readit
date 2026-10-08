@@ -59,6 +59,6 @@ export async function startMcp(): Promise<void> {
   await server.connect(transport);
   logger.info(
     { profileDir: config.profileDir, headless: config.headless },
-    'readit-idgaf MCP server ready (stdio)'
+    'readit MCP server ready (stdio)'
   );
 }

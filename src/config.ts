@@ -38,12 +38,12 @@ function intFromEnv(name: string, fallback: number): number {
 export function loadConfig(): Config {
   const dataHome = process.env.XDG_DATA_HOME ?? join(homedir(), '.local', 'share');
   const configHome = process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config');
-  const dataDir = join(dataHome, 'readit-idgaf');
+  const dataDir = join(dataHome, 'readit');
   return {
     profileDir: process.env.READIT_PROFILE_DIR ?? join(dataDir, 'profile'),
     dbPath: process.env.READIT_DB_PATH ?? join(dataDir, 'readit.db'),
-    keyFile: process.env.READIT_KEY_FILE ?? join(configHome, 'readit-idgaf', 'secret.key'),
-    dashboardTokenFile: join(configHome, 'readit-idgaf', 'dashboard.token'),
+    keyFile: process.env.READIT_KEY_FILE ?? join(configHome, 'readit', 'secret.key'),
+    dashboardTokenFile: join(configHome, 'readit', 'dashboard.token'),
     dashboardPort: intFromEnv('READIT_DASHBOARD_PORT', 7777),
     headless: process.env.READIT_HEADLESS !== 'false',
     idleMs: intFromEnv('READIT_IDLE_MS', 10 * 60 * 1000),

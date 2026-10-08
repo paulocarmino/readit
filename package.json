@@ -1,5 +1,5 @@
 {
-  "name": "readit-idgaf",
+  "name": "readit",
   "version": "1.0.0",
   "description": "Local MCP browser for AI agents to read pages using your own Chromium profile",
   "scripts": {
@@ -44,10 +44,10 @@
     "typescript-eslint": "^8.70.0"
   },
   "type": "module",
-  "bin": {
-    "readit-idgaf": "dist/index.js"
-  },
   "engines": {
     "node": ">=22"
+  },
+  "bin": {
+    "readit": "dist/index.js"
   }
 }

@@ -1,4 +1,4 @@
-// readit-idgaf dashboard. Plain ES module, no build step. All text is inserted with
+// readit dashboard. Plain ES module, no build step. All text is inserted with
 // textContent (never innerHTML), because URLs, errors and logs come from arbitrary web pages.
 
 const REFRESH_MS = 5000;

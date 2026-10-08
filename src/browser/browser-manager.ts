@@ -238,7 +238,7 @@ export class BrowserManager {
       const message = errorMessage(error);
       if (PROFILE_LOCK_PATTERN.test(message)) {
         throw new UserFacingError(
-          `The browser profile at ${this.config.profileDir} is in use by another Chromium (probably another readit-idgaf instance from a different MCP client). Close it, or set READIT_PROFILE_DIR to a different directory for this client.`
+          `The browser profile at ${this.config.profileDir} is in use by another Chromium (probably another readit instance from a different MCP client). Close it, or set READIT_PROFILE_DIR to a different directory for this client.`
         );
       }
       throw error;

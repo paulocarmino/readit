@@ -68,5 +68,5 @@ export function createLogger(store?: CallStore): Logger {
 
   // The root level must let through everything any stream wants.
   const rootLevel: pino.Level = (pino.levels.values[level] ?? 30) < 30 ? level : 'info';
-  return pino({ name: 'readit-idgaf', level: rootLevel }, pino.multistream(streams));
+  return pino({ name: 'readit', level: rootLevel }, pino.multistream(streams));
 }

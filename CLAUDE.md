@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-## Projeto: readit-idgaf
+## Projeto: readit
 
 Servidor MCP (stdio) que dá a agentes de IA um navegador local para ler UMA página por vez, a pedido
 do usuário, usando o Chromium com o perfil persistente dele (logins, cookies, IP residencial).
@@ -10,7 +10,7 @@ Versão "lite" do `~/playwright-orchestrator`: sem fila, sem servidor HTTP, sem 
 
 ```
 src/
-  index.ts                 entrypoint: `readit-idgaf` (MCP) ou `readit-idgaf dashboard`
+  index.ts                 entrypoint: `readit` (MCP) ou `readit dashboard`
   mcp.ts                   MCP stdio: abre stores, transport, shutdown (SIGINT/SIGTERM/fim do stdin)
   server.ts                tools MCP + rastreamento de cada call (callId, status, logs)
   dashboard/server.ts      dashboard HTTP (node:http) em 127.0.0.1; UI estática em public/
@@ -77,7 +77,7 @@ verdade com um cliente MCP (SDK `Client` + `StdioClientTransport`) contra págin
 ### Navegador
 
 - Um único `launchPersistentContext` em `READIT_PROFILE_DIR` (padrão
-  `~/.local/share/readit-idgaf/profile`). Dois processos não podem usar o mesmo perfil ao mesmo tempo.
+  `~/.local/share/readit/profile`). Dois processos não podem usar o mesmo perfil ao mesmo tempo.
 - Headless por padrão; `open_browser` relança headed no mesmo perfil para login/captcha manual.
   O headed fica aberto até `close_browser` (sem idle timeout); o headless fecha após `READIT_IDLE_MS`.
 - `channel: 'chromium'` (binário completo, new headless) nos dois modos; UA sem "HeadlessChrome".
@@ -87,16 +87,16 @@ verdade com um cliente MCP (SDK `Client` + `StdioClientTransport`) contra págin
 
 ### Dados, dashboard e credenciais
 
-- Banco único `READIT_DB_PATH` (padrão `~/.local/share/readit-idgaf/readit.db`), compartilhado entre
+- Banco único `READIT_DB_PATH` (padrão `~/.local/share/readit/readit.db`), compartilhado entre
   processos MCP e o dashboard. Migrações em `src/store/db.ts` (`PRAGMA user_version`): só adicionar
   novas, nunca editar as existentes.
 - Escritas de histórico são best effort: falha no banco nunca pode quebrar uma tool call.
 - Histórico guardado para sempre (decisão do usuário); limpeza só manual no dashboard.
-- Credenciais: valores cifrados (AES-256-GCM, chave em `~/.config/readit-idgaf/secret.key` 0600).
+- Credenciais: valores cifrados (AES-256-GCM, chave em `~/.config/readit/secret.key` 0600).
   **Nunca** logar, retornar em tool ou mandar ao frontend um valor de cookie. A UI só vê `preview`.
 - O `BrowserManager` sincroniza cookies no launch e antes de cada operação (checa
   `credentials_version` em `meta`), e remove do perfil cookies de credenciais apagadas.
-- Dashboard: só 127.0.0.1, token persistente (`~/.config/readit-idgaf/dashboard.token`, `--rotate-token` troca) → cookie
+- Dashboard: só 127.0.0.1, token persistente (`~/.config/readit/dashboard.token`, `--rotate-token` troca) → cookie
   HttpOnly SameSite=Strict de 30 dias; sem cookie, `/` serve `public/login.html`, checagem de
   Host/Origin, CSP sem inline (usar `el.style`/classes, nunca `style=""` nem `innerHTML`).
 - Frontend (`public/`) é JS puro sem build; texto sempre via `textContent`.

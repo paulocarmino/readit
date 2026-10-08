@@ -1,4 +1,4 @@
-# readit-idgaf
+# readit
 
 A local browser for AI agents. An MCP server (stdio) that lets Claude Code, Codex and other MCP
 clients read **one page at a time, when you ask**, using **your** Chromium profile: your logins,
@@ -9,7 +9,7 @@ This is not a scraper. There is no crawling, queue or concurrency: one page, on 
 
 ## How it works
 
-- One Chromium with a persistent profile at `~/.local/share/readit-idgaf/profile`, launched lazily on
+- One Chromium with a persistent profile at `~/.local/share/readit/profile`, launched lazily on
   the first tool call and closed when the MCP client exits.
 - Headless by default. `open_browser` relaunches it **visible** on the same profile so you can log in
   or solve a captcha. On WSL2 the window shows up through WSLg.
@@ -27,7 +27,7 @@ pnpm dashboard
 ```
 
 Opens `http://localhost:7777/?token=…` (on WSL it opens in your Windows browser). The token is
-kept in `~/.config/readit-idgaf/dashboard.token`, so the link can be bookmarked; without it the page
+kept in `~/.config/readit/dashboard.token`, so the link can be bookmarked; without it the page
 asks you to paste the token. `pnpm dashboard --rotate-token` generates a new one. Separate process
 from the MCP server: it reads the same database, so it shows calls from every MCP client and works
 even when no agent is running.
@@ -47,8 +47,8 @@ History is kept forever; use _Clear history_ to wipe it.
 ### How credentials are stored
 
 - Cookie values are encrypted with **AES-256-GCM** (row id as associated data) in
-  `~/.local/share/readit-idgaf/readit.db`. The key lives in a separate file,
-  `~/.config/readit-idgaf/secret.key` (mode 0600, created on first use), or in `READIT_SECRET_KEY`.
+  `~/.local/share/readit/readit.db`. The key lives in a separate file,
+  `~/.config/readit/secret.key` (mode 0600, created on first use), or in `READIT_SECRET_KEY`.
 - Values are never shown again, logged or returned by any tool: the dashboard shows only
   `name=••••abcd`.
 - On every browser launch, and on the next call after a change in the dashboard, the MCP server
@@ -78,8 +78,8 @@ Requires **Node 22** (there is a `.mise.toml`, so `mise install` picks it up), *
 desktop or WSL2 with WSLg (needed only for the visible window).
 
 ```bash
-git clone git@github.com:paulocarmino/readit.git readit-idgaf
-cd readit-idgaf
+git clone git@github.com:paulocarmino/readit.git readit
+cd readit
 mise install                        # or use your own Node 22
 pnpm install
 pnpm exec playwright install chromium
@@ -87,33 +87,33 @@ pnpm build
 ```
 
 Nothing else is needed: the profile, the database and the encryption key are created on first use.
-Replace `/home/pcarmino/readit-idgaf` below with wherever you cloned it.
+Replace `/home/pcarmino/readit` below with wherever you cloned it.
 
 ### Register in Claude Code
 
 ```bash
-claude mcp add readit-idgaf --scope user -- node /home/pcarmino/readit-idgaf/dist/index.js
+claude mcp add readit --scope user -- node /home/pcarmino/readit/dist/index.js
 ```
 
 ### Register in Codex CLI
 
 ```bash
-codex mcp add readit-idgaf -- node /home/pcarmino/readit-idgaf/dist/index.js
+codex mcp add readit -- node /home/pcarmino/readit/dist/index.js
 ```
 
 Or in `~/.codex/config.toml`:
 
 ```toml
-[mcp_servers.readit-idgaf]
+[mcp_servers.readit]
 command = "node"
-args = ["/home/pcarmino/readit-idgaf/dist/index.js"]
+args = ["/home/pcarmino/readit/dist/index.js"]
 ```
 
 Chromium locks its profile, so **two clients cannot use the same profile at the same time**. If you
 run Claude Code and Codex at once, give one of them its own profile (and log in there too):
 
 ```bash
-claude mcp add readit-idgaf --scope user -e READIT_PROFILE_DIR=/home/pcarmino/.local/share/readit-idgaf/profile-claude -- node /home/pcarmino/readit-idgaf/dist/index.js
+claude mcp add readit --scope user -e READIT_PROFILE_DIR=/home/pcarmino/.local/share/readit/profile-claude -- node /home/pcarmino/readit/dist/index.js
 ```
 
 ### First login (Reddit, etc.)
@@ -127,12 +127,12 @@ done. Both end up as cookies in the profile.
 Nothing below is in git. All of it is created automatically the first time it is needed, so a fresh
 clone works right away — it just starts empty (not logged in anywhere, no history).
 
-| Path                                     | What it is                                       | Created when                 |
-| ---------------------------------------- | ------------------------------------------------ | ---------------------------- |
-| `~/.local/share/readit-idgaf/profile/`   | Chromium profile: cookies, logins, local storage | first tool call              |
-| `~/.local/share/readit-idgaf/readit.db`  | Call history, logs, encrypted credentials        | first run (MCP or dashboard) |
-| `~/.config/readit-idgaf/secret.key`      | AES-256 key for credentials (random, mode 0600)  | first run (MCP or dashboard) |
-| `~/.config/readit-idgaf/dashboard.token` | Dashboard access token (random, mode 0600)       | first `pnpm dashboard`       |
+| Path                               | What it is                                       | Created when                 |
+| ---------------------------------- | ------------------------------------------------ | ---------------------------- |
+| `~/.local/share/readit/profile/`   | Chromium profile: cookies, logins, local storage | first tool call              |
+| `~/.local/share/readit/readit.db`  | Call history, logs, encrypted credentials        | first run (MCP or dashboard) |
+| `~/.config/readit/secret.key`      | AES-256 key for credentials (random, mode 0600)  | first run (MCP or dashboard) |
+| `~/.config/readit/dashboard.token` | Dashboard access token (random, mode 0600)       | first `pnpm dashboard`       |
 
 To use your own encryption key instead of the file (e.g. from a password manager):
 
@@ -144,28 +144,28 @@ openssl rand -base64 32          # put the result in READIT_SECRET_KEY
 
 - **Simplest:** copy nothing. Clone, run, and add the credentials again in the dashboard (and/or log
   in once with `open_browser`).
-- **To keep the credentials:** copy both `~/.config/readit-idgaf/secret.key` **and**
-  `~/.local/share/readit-idgaf/readit.db`. The database alone is useless without the key — that is
+- **To keep the credentials:** copy both `~/.config/readit/secret.key` **and**
+  `~/.local/share/readit/readit.db`. The database alone is useless without the key — that is
   the point of keeping them apart.
 - **To keep the logged-in sessions without the credentials feature:** copy
-  `~/.local/share/readit-idgaf/profile/`. Treat it like a password file; it holds live cookies.
+  `~/.local/share/readit/profile/`. Treat it like a password file; it holds live cookies.
 - Lost the key? Delete the credentials in the dashboard and add them again; everything else (history,
   logs) keeps working.
 
 ## Configuration (env vars)
 
-| Variable                | Default                                 | Meaning                                                       |
-| ----------------------- | --------------------------------------- | ------------------------------------------------------------- |
-| `READIT_PROFILE_DIR`    | `~/.local/share/readit-idgaf/profile`   | Chromium profile directory                                    |
-| `READIT_HEADLESS`       | `true`                                  | `false` = always use a visible window                         |
-| `READIT_IDLE_MS`        | `600000`                                | Close the headless browser after this idle time (`0` = never) |
-| `READIT_TIMEOUT_MS`     | `30000`                                 | Navigation / request timeout                                  |
-| `READIT_MAX_CHARS`      | `40000`                                 | Default `max_chars` of `read_page`                            |
-| `READIT_LOG_LEVEL`      | `info`                                  | pino level (logs go to stderr; info+ also to the DB)          |
-| `READIT_DB_PATH`        | `~/.local/share/readit-idgaf/readit.db` | History, logs and credentials                                 |
-| `READIT_KEY_FILE`       | `~/.config/readit-idgaf/secret.key`     | Credential encryption key                                     |
-| `READIT_SECRET_KEY`     | —                                       | Base64 32-byte key (overrides the key file)                   |
-| `READIT_DASHBOARD_PORT` | `7777`                                  | Dashboard port                                                |
+| Variable                | Default                           | Meaning                                                       |
+| ----------------------- | --------------------------------- | ------------------------------------------------------------- |
+| `READIT_PROFILE_DIR`    | `~/.local/share/readit/profile`   | Chromium profile directory                                    |
+| `READIT_HEADLESS`       | `true`                            | `false` = always use a visible window                         |
+| `READIT_IDLE_MS`        | `600000`                          | Close the headless browser after this idle time (`0` = never) |
+| `READIT_TIMEOUT_MS`     | `30000`                           | Navigation / request timeout                                  |
+| `READIT_MAX_CHARS`      | `40000`                           | Default `max_chars` of `read_page`                            |
+| `READIT_LOG_LEVEL`      | `info`                            | pino level (logs go to stderr; info+ also to the DB)          |
+| `READIT_DB_PATH`        | `~/.local/share/readit/readit.db` | History, logs and credentials                                 |
+| `READIT_KEY_FILE`       | `~/.config/readit/secret.key`     | Credential encryption key                                     |
+| `READIT_SECRET_KEY`     | —                                 | Base64 32-byte key (overrides the key file)                   |
+| `READIT_DASHBOARD_PORT` | `7777`                            | Dashboard port                                                |
 
 ## Adding a site adapter
 
