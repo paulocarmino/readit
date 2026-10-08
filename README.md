@@ -74,12 +74,20 @@ When a page is blocked or needs login, `read_page` says so and tells the agent t
 
 ## Setup
 
+Requires **Node 22** (there is a `.mise.toml`, so `mise install` picks it up), **pnpm**, and a Linux
+desktop or WSL2 with WSLg (needed only for the visible window).
+
 ```bash
-cd ~/readit-idgaf
+git clone git@github.com:paulocarmino/readit.git readit-idgaf
+cd readit-idgaf
+mise install                        # or use your own Node 22
 pnpm install
 pnpm exec playwright install chromium
 pnpm build
 ```
+
+Nothing else is needed: the profile, the database and the encryption key are created on first use.
+Replace `/home/pcarmino/readit-idgaf` below with wherever you cloned it.
 
 ### Register in Claude Code
 
@@ -113,6 +121,36 @@ claude mcp add readit-idgaf --scope user -e READIT_PROFILE_DIR=/home/pcarmino/.l
 Either add a credential in the dashboard (`pnpm dashboard` → Credentials), or ask the agent to
 "open the browser at https://www.reddit.com/login", log in in the window and tell the agent you're
 done. Both end up as cookies in the profile.
+
+## State lives outside the repo
+
+Nothing below is in git. All of it is created automatically the first time it is needed, so a fresh
+clone works right away — it just starts empty (not logged in anywhere, no history).
+
+| Path                                     | What it is                                       | Created when                 |
+| ---------------------------------------- | ------------------------------------------------ | ---------------------------- |
+| `~/.local/share/readit-idgaf/profile/`   | Chromium profile: cookies, logins, local storage | first tool call              |
+| `~/.local/share/readit-idgaf/readit.db`  | Call history, logs, encrypted credentials        | first run (MCP or dashboard) |
+| `~/.config/readit-idgaf/secret.key`      | AES-256 key for credentials (random, mode 0600)  | first run (MCP or dashboard) |
+| `~/.config/readit-idgaf/dashboard.token` | Dashboard access token (random, mode 0600)       | first `pnpm dashboard`       |
+
+To use your own encryption key instead of the file (e.g. from a password manager):
+
+```bash
+openssl rand -base64 32          # put the result in READIT_SECRET_KEY
+```
+
+### Moving to another machine, or backing up
+
+- **Simplest:** copy nothing. Clone, run, and add the credentials again in the dashboard (and/or log
+  in once with `open_browser`).
+- **To keep the credentials:** copy both `~/.config/readit-idgaf/secret.key` **and**
+  `~/.local/share/readit-idgaf/readit.db`. The database alone is useless without the key — that is
+  the point of keeping them apart.
+- **To keep the logged-in sessions without the credentials feature:** copy
+  `~/.local/share/readit-idgaf/profile/`. Treat it like a password file; it holds live cookies.
+- Lost the key? Delete the credentials in the dashboard and add them again; everything else (history,
+  logs) keeps working.
 
 ## Configuration (env vars)
 
