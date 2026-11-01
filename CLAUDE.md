@@ -29,7 +29,7 @@ src/
     index.ts               LISTA de adaptadores (único lugar a tocar para registrar um site novo)
     generic/               Readability + turndown, scrubber de banners/modais
     reddit/                JSON (.json, /api/morechildren) com cookies do perfil; fallback old.reddit
-  lib/                     retry (backoff com jitter), truncate (paginação por start_index)
+  lib/                     retry (backoff com jitter), truncate (paginação por start_index), save (save_to)
 ```
 
 ## Comandos

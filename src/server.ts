@@ -9,6 +9,7 @@ import type { BrowserManager } from './browser/browser-manager.js';
 import { navigate } from './browser/navigate.js';
 import type { Config } from './config.js';
 import { UserFacingError, errorMessage } from './errors.js';
+import { saveDocument } from './lib/save.js';
 import { truncate } from './lib/truncate.js';
 import type { Logger } from './logger.js';
 import type { CallFinish, CallStatus, CallStore } from './store/calls.js';
@@ -174,6 +175,7 @@ export function createServer({
         "Opens ONE URL in the user's own Chromium (persistent profile: their logins, cookies and residential IP), waits for JS to render, removes noise and returns clean markdown with title and final URL.",
         'Works on JS-heavy sites and sites that block scrapers. Long results are paginated: pass start_index as instructed at the end of the output (served from a 10 min cache, no reload).',
         'If the result says the page is blocked or needs login, call open_browser with the URL and ask the user to solve it in the window, then retry.',
+        'To keep the exact text without loading it into the conversation, pass save_to: the whole page goes to that file and only its header comes back.',
         '',
         'Adapters (picked by domain; force one with `adapter`):',
         registry.describe(),
@@ -211,8 +213,14 @@ export function createServer({
           .record(z.string(), z.unknown())
           .optional()
           .describe('Options for the chosen adapter (see list above).'),
+        save_to: z
+          .string()
+          .optional()
+          .describe(
+            'Absolute .md or .txt path (Windows paths are accepted). Writes the whole page there, replacing any existing file, and returns only its header. max_chars and start_index are ignored.'
+          ),
       },
-      annotations: { readOnlyHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: false, openWorldHint: true },
     },
     (args) =>
       tracked('read_page', args, async (call) => {
@@ -266,6 +274,12 @@ export function createServer({
             return formatPageResult(result, adapter.name, Date.now() - started);
           });
           cacheSet(key, full);
+        }
+
+        if (args.save_to) {
+          const path = await saveDocument(args.save_to, full);
+          const header = full.slice(0, full.indexOf('\n\n---\n\n'));
+          return text(`Saved ${full.length} chars to ${path}\n\n${header}`);
         }
 
         return text(truncate(full, args.max_chars ?? config.maxChars, args.start_index ?? 0).text);
